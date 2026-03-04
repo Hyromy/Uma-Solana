@@ -1,0 +1,19 @@
+# Rust build output
+target/
+
+# Cargo lock (keep for binaries, ignore for libraries — this is a binary)
+# Cargo.lock  ← intentionally tracked for reproducible builds
+
+# Editor / IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / secrets
+.env
+*.pem
+*.key
