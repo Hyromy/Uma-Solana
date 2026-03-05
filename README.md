@@ -146,6 +146,8 @@ Program ID: `72PwRxpFvGCHWq6LXE5rHo7hRDcgRKNbcPd5FMxinWjp`
 
 Available instructions: `create_uma` · `train` · `rest` · `recreation` · `race`
 
+For best experience play [Umamusume Pretty Derby](https://umamusume.com)
+
 <p align="center">
   <img src="./images/haru-urara.gif" alt="Haru Urara" height="200">
 </p>
