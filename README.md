@@ -1,60 +1,151 @@
-# Biblioteca en Solana
+# Uma-Solana
 
-![banner](./images/banner-biblioteca.jpg)
+<p align="center">
+  <img src="./images/oguri-cap-dance.gif" alt="Oguri Cap" height="160">
+  <img src="./images/super-creek-dance.gif" alt="Super Creek" height="160">
+</p>
 
-CRUD básico de un Solana Program desarrollado con Rust y Anchor desde el Solana Playground. 
+A text-based game inspired by **Umamusume Pretty Derby**, built in Rust. Train your Uma, manage her energy and mood, and compete in races. Lose too many times and she might retire for good.
 
-Puedes comenzar dándole Fork a este repositorio (abajo te explicamos como 👇), **hemos preparado un entorno de codespaces listo para que no tengas que instalar nada**, solo déjate llevar por la fluidez de los ejercicios y temas desarrollados especialmente para ti. 
+The project has two versions: a **local CLI** and an **on-chain Solana program** built with Anchor.
 
-Asegúrate de clonar este repositorio a tu cuenta usando el botón **`Fork`**.
+---
 
-![fork](./images/fork.png)
+## Gameplay
 
-## Importando el proyecto 
+Each run starts by naming your Uma (leave it blank for a random name). From that point, turns count down to race day. On each turn you choose one action:
 
-Ya con el repositorio en tu cuenta lo siguiente que debes hacer copiar el `enlace de tu repositorio`, lo que se puede hacer directamente desdel navegador:
+| Action | Effect |
+|---|---|
+| **Train Speed** | Increases speed stat |
+| **Train Stamina** | Increases stamina stat |
+| **Train Power** | Increases power stat |
+| **Train Guts** | Increases guts stat |
+| **Train Wit** | Increases wit stat |
+| **Rest** | Recovers energy |
+| **Recreation** | Improves mood |
 
-![repo](./images/repo.png)
-Posteriormente, lo uniremos con el siguiente enlace en nuestro navegador de preferencia:
+When the countdown reaches zero it's race day. After the race, win or lose, a new countdown begins for the next one.
 
-```url
-https://beta.solpg.io/
+---
+
+## Stats
+
+Each stat is rated from **G** up to **SS+** and affects different parts of a race.
+
+| Stat | Role |
+|---|---|
+| **Speed** | Core performance in the mid and late stages of the race |
+| **Stamina** | Prevents a penalty on longer distances |
+| **Power** | Early race burst and surface efficiency |
+| **Guts** | Reduces the stamina penalty when stamina is too low |
+| **Wit** | Multiplies the effectiveness of your running style |
+
+Training has a **failure chance** that increases as the stat grows higher or when energy is low. A failed training session still costs a turn.
+
+---
+
+## Aptitudes
+
+Each Uma is born with hidden aptitude grades for track, distance, and running style. These act as multipliers on the corresponding stats during race scoring and are revealed progressively.
+
+**Track**
+- Turf
+- Dirt
+
+**Distance**
+- Sprint (1000–1400 m)
+- Mile (1600–1800 m)
+- Medium (2000–2400 m)
+- Long (2500–3600 m)
+
+**Running Style**
+- Front — strong early, fades late
+- Pace — balanced with a mid-race emphasis
+- Late — builds up through the race
+- End — explosive final stretch
+
+---
+
+## Energy & Mood
+
+**Energy** (0–100) affects training failure chance. Low energy makes training riskier. Use **Rest** to recover it.
+
+**Mood** has five levels and applies a bonus or penalty to race performance:
+
+| Mood | Symbol | Race modifier |
+|---|---|---|
+| Great | `(^)` | +bonus |
+| Good | `(/)` | +small bonus |
+| Normal | `(-)` | neutral |
+| Bad | `(\)` | -small penalty |
+| Awful | `(v)` | -penalty |
+
+Use **Recreation** to improve mood by one level.
+
+---
+
+## Races
+
+On race day your Uma competes against a field of bot runners on a randomly generated racecourse (random surface, random distance). Early races use weaker bots to give you room to grow; the field becomes more competitive over time.
+
+**Race score** is calculated from weighted phases:
+
+- **Early phase** — Power + Wit
+- **Mid phase** — Speed + Wit
+- **Late phase** — Speed + Power
+
+Stamina determines whether you can sustain peak performance. Guts softens the blow when stamina falls short.
+
+### After the race
+
+- **Win** — a new countdown of 8–14 turns begins.
+- **Loss** — there is a chance of **retirement** that increases with each failed race (10% → 20% → 30% → 40% → 50%+). If she survives, training resumes with a shorter countdown.
+
+---
+
+## Project Structure
+
+```
+Uma-Solana/
+├── src/               # Solana on-chain program (Anchor)
+│   ├── lib.rs         # Program entry points (create_uma, train, rest, recreation, race)
+│   ├── uma.rs         # Uma struct, stats, mood, energy, training and race logic
+│   ├── race.rs        # Race orchestration and scoring
+│   ├── racecourse.rs  # Random track and distance generation
+│   ├── bot.rs         # Bot AI trainer and style picker
+│   └── random.rs      # On-chain randomness utilities
+└── uma/               # Local CLI version (Rust binary)
+    └── src/
+        ├── main.rs
+        ├── classes/   # Uma, Race, Racecourse, Bot
+        └── utils/     # Terminal drawer, keyboard input, random helpers
 ```
 
-Lo que nos dará algo parecido a:
+---
 
-![url](./images/url.png)
+## Running Locally
 
-Al pulsar enter seremos enviados al `Solana Playground` con nuestro proyecto abierto:
+```bash
+cd uma
+cargo run
+```
 
-![pg](./images/pg.png)
+Requires Rust (edition 2024).
 
-Para guardarlo solo damos clic en el boton `import` y asignamos un nombre:
+## Deploying to Solana
 
-![import](./images/import.png)
+The on-chain program is built with [Anchor](https://www.anchor-lang.com/). Deploy it to devnet and interact with it via the `client/client.ts` script or any Anchor-compatible client.
 
-## Preparacion del entorno
+```bash
+anchor build
+anchor deploy
+```
 
-Primero conectaremos el entorno con la devnet, lo que tambien procederá a la creación de una wallet. Para eso daremos clic en donde dice **Not Conected**:
+Program ID: `72PwRxpFvGCHWq6LXE5rHo7hRDcgRKNbcPd5FMxinWjp`
 
-![playground1](./images/playground1.png)
+Available instructions: `create_uma` · `train` · `rest` · `recreation` · `race`
 
-Saldrá la siguiente ventana donde daremos en el botón **Continue**:
-
-![wallet](./images/wallet.png)
-
-Como resultado se mostrará la siguiente información:
-
-![status](./images/status.png)
-
-* En verde: el estado de la conexión y el entorno al que se encuentra conectado
-
-* En amarillo: la la dirección de la wallet conectada
-
-* En azul: la cantidad de tokens en la wallet
-
-> ℹ️ ¿Quieres ver el ejemplo de un "Hola Mundo" en Solana?. Da clic aquí: 👉 [Ver Ejemplo](https://github.com/WayLearnLatam/Solana-starter-kit/tree/1fc6349ba63375a3fe223d8d56911bc64765459b/build-deploy)
-
-> ℹ️ ¿Cuentas con una Wallet de [Phantom](https://phantom.com/) que deseas importar?, Da clic aquí para ver como hacerlo: 
-
-👉 [Como Importar una Wallet](https://github.com/WayLearnLatam/Solana-starter-kit/tree/1fc6349ba63375a3fe223d8d56911bc64765459b/import-key-a-playground)
+<p align="center">
+  <img src="./images/haru-urara.gif" alt="Haru Urara" height="200">
+</p>
