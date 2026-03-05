@@ -1,133 +1,131 @@
 use anchor_lang::prelude::*;
+
+mod random;
+mod racecourse;
+mod uma;
+mod bot;
+mod race;
+
+use uma::{Uma, StatType};
+use race::prepare_to_race;
+
 declare_id!("72PwRxpFvGCHWq6LXE5rHo7hRDcgRKNbcPd5FMxinWjp");
 
 #[program]
-pub mod biblioteca {
+pub mod uma_solana {
     use super::*;
 
-    pub fn crear_biblioteca(context: Context<NuevaBiblioteca>, nombre: String) -> Result<()> {
-        let owner = context.accounts.owner.key();
-        let libros: Vec<Libro> = Vec::new();
-
-        context.accounts.biblioteca.set_inner(Biblioteca {
-            owner,
-            nombre,
-            libros,
-        });
-
+    /// Crea una nueva Uma para el signer.
+    /// Seeds: ["uma", owner_pubkey]
+    pub fn create_uma(ctx: Context<CreateUma>, name: String) -> Result<()> {
+        let acc   = &mut ctx.accounts.uma_account;
+        acc.owner = ctx.accounts.owner.key();
+        acc.uma   = Uma::new(name, true);
+        acc.bump  = ctx.bumps.uma_account;
         Ok(())
     }
 
-    pub fn agregar_libro(context: Context<NuevoLibro>, nombre: String, paginas: u16) -> Result<()> {
-        let libro = Libro {
-            nombre,
-            paginas,
-            disponible: true,
-        };
-
-        context.accounts.biblioteca.libros.push(libro);
-
+    /// Entrena un stat. stat_id: 0=Speed 1=Stamina 2=Power 3=Guts 4=Wit
+    pub fn train(ctx: Context<GameAction>, stat_id: u8) -> Result<()> {
+        let uma  = &mut ctx.accounts.uma_account.uma;
+        let stat = StatType::from_u8(stat_id).ok_or(UmaError::InvalidStat)?;
+        let fc   = uma.failure_chance(&stat);
+        uma.train(stat, fc);
         Ok(())
     }
 
-    pub fn ver_libros(context: Context<NuevoLibro>) -> Result<()> {
-        msg!(
-            "La lista de libros es: {:#?}",
-            context.accounts.biblioteca.libros
-        );
-
+    /// Descansa: recupera energía, cuesta un turno de entrenamiento.
+    pub fn rest(ctx: Context<GameAction>) -> Result<()> {
+        ctx.accounts.uma_account.uma.rest();
         Ok(())
     }
 
-    pub fn eliminar_libro(context: Context<NuevoLibro>, nombre: String) -> Result<()> {
-        let libros = &mut context.accounts.biblioteca.libros;
+    /// Recreación: mejora el ánimo, cuesta un turno de entrenamiento.
+    pub fn recreation(ctx: Context<GameAction>) -> Result<()> {
+        ctx.accounts.uma_account.uma.recreation();
+        Ok(())
+    }
 
-        for libro in 0..libros.len() {
-            if libros[libro].nombre == nombre {
-                libros.remove(libro);
-                msg!("Libro {nombre} eliminado!");
-                return Ok(());
-            }
+    /// Corre la carrera programada. Los resultados se loggean con msg!().
+    pub fn race(ctx: Context<GameAction>) -> Result<()> {
+        let uma_acc = &mut ctx.accounts.uma_account;
+
+        if uma_acc.uma.get_turns_to_race() > 0 {
+            return Err(UmaError::CannotRaceYet.into());
         }
 
-        Err(Errores::LibroNoExiste.into())
-    }
+        let placeholder  = Uma::new_placeholder();
+        let uma          = core::mem::replace(&mut uma_acc.uma, placeholder);
+        let mut race_obj = prepare_to_race(uma).expect("turns_to_race already verified");
+        let position     = race_obj.run();
 
-    pub fn alternar_estado(context: Context<NuevoLibro>, nombre: String) -> Result<()> {
-        let libros = &mut context.accounts.biblioteca.libros;
+        let mut all    = race_obj.into_runners();
+        let pi         = all.iter().position(|r| r.is_human()).unwrap();
+        let mut player = all.remove(pi);
+        player.race_result(position);
 
-        for libro in 0..libros.len() {
-            let estado = libros[libro].disponible;
-
-            if libros[libro].nombre == nombre {
-                let nuevo_estado = !estado;
-                libros[libro].disponible = nuevo_estado;
-
-                msg!(
-                    "El libro: {} ahora tiene un valor de disponibilidad: {}",
-                    nombre,
-                    nuevo_estado
-                );
-                return Ok(());
-            }
-        }
-
-        Err(Errores::LibroNoExiste.into())
+        uma_acc.uma = player;
+        Ok(())
     }
 }
 
-#[error_code]
-pub enum Errores {
-    #[msg("Error, no eres el propietario de la cuenta.")]
-    NoEresElOwner,
-
-    #[msg("Error, el libro proporcionado no existe.")]
-    LibroNoExiste,
-}
+// ---------------------------------------------------------------------------
+// Cuenta
+// ---------------------------------------------------------------------------
 
 #[account]
-#[derive(InitSpace)]
-pub struct Biblioteca {
-    owner: Pubkey,
-
-    #[max_len(60)]
-    nombre: String,
-
-    #[max_len(10)]
-    libros: Vec<Libro>,
+pub struct UmaAccount {
+    pub owner: Pubkey,
+    pub uma:   Uma,
+    pub bump:  u8,
+}
+impl UmaAccount {
+    pub const SIZE: usize = 8 + 32 + Uma::BORSH_SIZE + 1;
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace, PartialEq, Debug)]
-pub struct Libro {
-    #[max_len(60)]
-    nombre: String,
-
-    paginas: u16,
-
-    disponible: bool,
-}
+// ---------------------------------------------------------------------------
+// Contextos
+// ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-pub struct NuevaBiblioteca<'info> {
+pub struct CreateUma<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
     #[account(
         init,
         payer = owner,
-        space = Biblioteca::INIT_SPACE + 8,
-        seeds = [b"biblioteca", owner.key().as_ref()],
+        space = UmaAccount::SIZE,
+        seeds = [b"uma", owner.key().as_ref()],
         bump
     )]
-    pub biblioteca: Account<'info, Biblioteca>,
+    pub uma_account: Account<'info, UmaAccount>,
 
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct NuevoLibro<'info> {
+pub struct GameAction<'info> {
     pub owner: Signer<'info>,
 
-    #[account(mut)]
-    pub biblioteca: Account<'info, Biblioteca>,
+    #[account(
+        mut,
+        seeds   = [b"uma", owner.key().as_ref()],
+        bump    = uma_account.bump,
+        has_one = owner,
+    )]
+    pub uma_account: Account<'info, UmaAccount>,
+}
+
+// ---------------------------------------------------------------------------
+// Errores
+// ---------------------------------------------------------------------------
+
+#[error_code]
+pub enum UmaError {
+    #[msg("stat_id inválido — usa 0=Speed 1=Stamina 2=Power 3=Guts 4=Wit")]
+    InvalidStat,
+
+    #[msg("No puedes correr todavía, quedan turnos de entrenamiento")]
+    CannotRaceYet,
 }
